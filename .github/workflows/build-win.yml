@@ -1,0 +1,52 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      BUILD_TYPE: Release
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache prebuilt libraries
+        id: cache-libs
+        uses: actions/cache@v4
+        with:
+          path: Libraries/win64
+          key: win-libs-${{ hashFiles('Telegram/build/prepare/**') }}
+          restore-keys: win-libs-
+
+      - name: Prepare libraries
+        if: steps.cache-libs.outputs.cache-hit != 'true'
+        working-directory: Telegram
+        shell: cmd
+        run: build\prepare\win.bat
+
+      - name: Configure
+        working-directory: Telegram
+        shell: cmd
+        run: configure.bat x64
+
+      - name: Build
+        run: cmake --build out --config ${{ env.BUILD_TYPE }} --parallel
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-win-x64
+          path: out/${{ env.BUILD_TYPE }}/AyuGram.exe

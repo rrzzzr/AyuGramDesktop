@@ -1,0 +1,39 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CONFIG: Release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build with Docker
+        run: |
+          docker run --rm \
+            -u "$(id -u)" \
+            -v "${{ github.workspace }}:/usr/src/tdesktop" \
+            -e CONFIG=${{ env.CONFIG }} \
+            ghcr.io/telegramdesktop/tdesktop/centos_env:latest \
+            /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh
+
+      - name: Strip binary
+        run: |
+          if [ -f out/Release/AyuGram ]; then
+            strip out/Release/AyuGram
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-linux-x86_64
+          path: out/Release/AyuGram
