@@ -13,6 +13,7 @@
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "data/data_document.h"
+#include "data/data_download_manager.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
@@ -119,6 +120,11 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 	crl::on_main([=]
 	{
 		data->save(Data::FileOriginMessage(item->fullId()), path);
+		Core::App().downloadManager().addLoading(Data::DownloadObject{
+			item,
+			data,
+			nullptr
+		});
 
 		session->downloaderTaskFinished() | rpl::filter([=]
 		{
@@ -144,6 +150,19 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 	}
 
 	base::take(lifetime)->destroy();
+
+	crl::on_main([=] {
+		if (data && data->size > 0 && fileSize(item) == data->size) {
+			Core::App().downloadManager().addLoaded(
+				Data::DownloadObject{
+					item,
+					data,
+					nullptr
+				},
+				data->filepath(true),
+				Core::App().downloadManager().computeNextStartDate());
+		}
+	});
 }
 
 void forwardMessagesSync(not_null<Main::Session*> session,
@@ -186,6 +205,16 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 	if (!view) {
 		return;
 	}
+	crl::on_main([=] {
+		const auto item = session->data().message(photo.second);
+		if (item) {
+			Core::App().downloadManager().addLoading(Data::DownloadObject{
+				item,
+				nullptr,
+				photo.first
+			});
+		}
+	});
 	view->wanted(Data::PhotoSize::Large, photo.second);
 
 	const auto finalCheck = [=]
@@ -201,6 +230,17 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 		const auto fullPath = nameBase + QString::number(photo.first->getDC()) + "_" + QString::number(photo.first->id)
 			+ ".jpg";
 		view->saveToFile(fullPath);
+		crl::on_main([=] {
+			const auto item = session->data().message(photo.second);
+			if (!item) {
+				return;
+			}
+			Core::App().downloadManager().addLoaded(Data::DownloadObject{
+				not_null{ item },
+				nullptr,
+				photo.first
+			}, fullPath, Core::App().downloadManager().computeNextStartDate());
+		});
 	};
 
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
