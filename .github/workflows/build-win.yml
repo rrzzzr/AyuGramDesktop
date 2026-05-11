@@ -16,7 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Init submodules
+        run: git submodule update --init --recursive
+        env:
+          GIT_TERMINAL_PROMPT: 0
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
