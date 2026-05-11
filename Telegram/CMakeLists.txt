@@ -1258,6 +1258,10 @@ PRIVATE
     info/common_groups/info_common_groups_inner_widget.h
     info/common_groups/info_common_groups_widget.cpp
     info/common_groups/info_common_groups_widget.h
+    info/forward/info_forward_inner_widget.cpp
+    info/forward/info_forward_inner_widget.h
+    info/forward/info_forward_widget.cpp
+    info/forward/info_forward_widget.h
     info/downloads/info_downloads_inner_widget.cpp
     info/downloads/info_downloads_inner_widget.h
     info/downloads/info_downloads_provider.cpp
