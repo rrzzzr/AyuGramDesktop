@@ -72,7 +72,7 @@ bool Provider::sectionItemBelongsHere(
 }
 
 bool Provider::isPossiblyMyItem(not_null<const HistoryItem*> item) {
-	return true;
+	return passesFilter(item);
 }
 
 std::optional<int> Provider::fullCount() {
@@ -131,6 +131,9 @@ void Provider::refreshViewer() {
 		for (const auto id : manager.loadingList()) {
 			if (!id->done) {
 				const auto item = id->object.item;
+				if (!passesFilter(item)) {
+					continue;
+				}
 				if (!copy.remove(item) && !_downloaded.contains(item)) {
 					_downloading.emplace(item);
 					addElementNow({
@@ -186,6 +189,9 @@ void Provider::refreshViewer() {
 
 void Provider::addPostponed(not_null<const Data::DownloadedId*> entry) {
 	Expects(entry->object != nullptr);
+	if (!passesFilter(entry->object->item)) {
+		return;
+	}
 
 	const auto item = entry->object->item;
 	trackItemSession(item);
@@ -373,6 +379,11 @@ bool Provider::isAfter(
 
 bool Provider::searchMode() const {
 	return !_queryWords.empty();
+}
+
+bool Provider::passesFilter(not_null<const HistoryItem*> item) const {
+	const auto &filter = _controller->downloadsFilter();
+	return filter ? filter(item->fullId()) : true;
 }
 
 void Provider::fillSearchIndex(Element &element) {

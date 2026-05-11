@@ -104,6 +104,7 @@ private:
 	[[nodiscard]] bool searchMode() const;
 	void fillSearchIndex(Element &element);
 	[[nodiscard]] bool computeIsFound(const Element &element) const;
+	[[nodiscard]] bool passesFilter(not_null<const HistoryItem*> item) const;
 
 	void itemRemoved(not_null<const HistoryItem*> item);
 	void markLayoutsStale();

@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+struct FullMsgId;
+
 #include "data/data_message_reaction_id.h"
 #include "data/data_search_controller.h"
 #include "info/peer_gifts/info_peer_gifts_common.h"
@@ -74,6 +76,8 @@ struct Tag {
 } // namespace Info::BotStarRef
 
 namespace Info {
+
+using DownloadsFilter = Fn<bool(FullMsgId)>;
 
 class Key {
 public:
@@ -279,6 +283,9 @@ public:
 		int limitAfter) const;
 	virtual rpl::producer<QString> mediaSourceQueryValue() const;
 	virtual rpl::producer<QString> searchQueryValue() const;
+	virtual const DownloadsFilter &downloadsFilter() const = 0;
+	virtual void setDownloadsFilter(DownloadsFilter filter) = 0;
+	virtual DownloadsFilter takeDownloadsFilter() = 0;
 
 	void showSection(
 		std::shared_ptr<Window::SectionMemento> memento,
@@ -345,6 +352,17 @@ public:
 	}
 
 	void saveSearchState(not_null<ContentMemento*> memento);
+	const DownloadsFilter &downloadsFilter() const override {
+		return _downloadsFilter;
+	}
+	void setDownloadsFilter(DownloadsFilter filter) override {
+		_downloadsFilter = std::move(filter);
+	}
+	DownloadsFilter takeDownloadsFilter() override {
+		auto result = std::move(_downloadsFilter);
+		_downloadsFilter = {};
+		return result;
+	}
 
 	void showSection(
 		std::shared_ptr<Window::SectionMemento> memento,
@@ -383,6 +401,7 @@ private:
 	std::unique_ptr<Api::DelayedSearchController> _searchController;
 	rpl::variable<bool> _seachEnabledByContent = false;
 	bool _searchStartsFocused = false;
+	DownloadsFilter _downloadsFilter;
 
 	// Data between sections based on steps.
 	std::any _stepData;
