@@ -13,6 +13,9 @@ namespace AyuForward {
 bool isForwarding(const PeerId &id);
 void cancelForward(const PeerId &id, const Main::Session &session);
 std::pair<QString, QString> stateName(const PeerId &id);
+std::vector<PeerId> activeForwardPeers();
+std::vector<FullMsgId> forwardDownloadItems(PeerId peer);
+bool isForwardDownloadItem(FullMsgId id);
 
 class ForwardState
 {
@@ -26,6 +29,8 @@ public:
 	};
 	void updateBottomBar(const Main::Session &session, const PeerId *peer, const State &st);
 
+	explicit ForwardState(int totalChunks) : totalChunks(totalChunks) {}
+
 	int totalChunks;
 	int currentChunk;
 	int totalMessages;
@@ -33,6 +38,8 @@ public:
 
 	State state = State::Preparing;
 	bool stopRequested = false;
+
+	std::vector<FullMsgId> downloadItems;
 
 };
 

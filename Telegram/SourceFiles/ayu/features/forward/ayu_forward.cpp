@@ -43,6 +43,40 @@ bool isForwarding(const PeerId &id) {
 	return false;
 }
 
+std::vector<PeerId> activeForwardPeers() {
+	std::vector<PeerId> result;
+	for (const auto &p : forwardStates) {
+		const auto &state = *p.second;
+		if (state.state != ForwardState::State::Finished && !state.stopRequested) {
+			result.emplace_back(p.first);
+		}
+	}
+	return result;
+}
+
+std::vector<FullMsgId> forwardDownloadItems(PeerId peer) {
+	std::vector<FullMsgId> result;
+	const auto fwState = forwardStates.find(peer);
+	if (fwState == forwardStates.end()) {
+		return result;
+	}
+	const auto &state = *fwState->second;
+	result = state.downloadItems;
+	return result;
+}
+
+bool isForwardDownloadItem(FullMsgId id) {
+	for (const auto &entry : forwardStates) {
+		const auto &items = entry.second->downloadItems;
+		for (const auto &itemId : items) {
+			if (itemId == id) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void cancelForward(const PeerId &id, const Main::Session &session) {
 	const auto fwState = forwardStates.find(id);
 	if (fwState != forwardStates.end()) {
@@ -356,6 +390,11 @@ void forwardMessages(
 	if (!toBeDownloaded.empty()) {
 		state->state = ForwardState::State::Downloading;
 		state->updateBottomBar(*session, &peer->id, ForwardState::State::Downloading);
+		state->downloadItems.clear();
+		state->downloadItems.reserve(toBeDownloaded.size());
+		for (const auto &it : toBeDownloaded) {
+			state->downloadItems.push_back(it->fullId());
+		}
 		AyuSync::loadDocuments(session, toBeDownloaded);
 	}
 
