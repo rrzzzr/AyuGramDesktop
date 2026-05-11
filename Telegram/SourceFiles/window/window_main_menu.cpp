@@ -38,6 +38,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "mtproto/mtproto_config.h"
 #include "settings/sections/settings_advanced.h"
+#include "ayu/features/forward/ayu_forward.h"
+#include "info/forward/info_forward_widget.h"
 #include "settings/sections/settings_calls.h"
 #include "settings/sections/settings_information.h"
 #include "storage/localstorage.h"
@@ -905,6 +907,14 @@ void MainMenu::setupMenu() {
 			},
 			ghostModeToggle->lifetime());
 	}
+
+	// Forward menu: shows active "download-then-forward" tasks and their progress
+	addAction(
+		tr::lng_forward_header_short(),
+		{ &st::menuIconForward }
+	)->setClickedCallback([=]() {
+			controller->show(Info::Forward::Make(_controller->session().user()));
+		});
 
 	if (settings.showStreamerToggleInDrawer()) {
 		const auto streamerModeToggle = addAction(
