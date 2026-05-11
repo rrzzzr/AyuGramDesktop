@@ -132,6 +132,7 @@ private:
 
 	void check(not_null<const HistoryItem*> item);
 	void check(not_null<DocumentData*> document);
+	void check(not_null<PhotoData*> photo);
 	void check(
 		SessionData &data,
 		std::vector<DownloadingId>::iterator i);
@@ -153,6 +154,7 @@ private:
 	[[nodiscard]] SessionData &sessionData(
 		not_null<const HistoryItem*> item);
 	[[nodiscard]] SessionData &sessionData(not_null<DocumentData*> document);
+	[[nodiscard]] SessionData &sessionData(not_null<PhotoData*> photo);
 
 	void resolve(not_null<Main::Session*> session, SessionData &data);
 	void resolveRequestsFinished(
@@ -184,6 +186,7 @@ private:
 	base::flat_map<not_null<Main::Session*>, SessionData> _sessions;
 	base::flat_set<not_null<const HistoryItem*>> _loading;
 	base::flat_set<not_null<DocumentData*>> _loadingDocuments;
+	base::flat_set<not_null<PhotoData*>> _loadingPhotos;
 	base::flat_set<not_null<const HistoryItem*>> _loadingDone;
 	base::flat_set<not_null<const HistoryItem*>> _loaded;
 	base::flat_set<not_null<HistoryItem*>> _generated;
