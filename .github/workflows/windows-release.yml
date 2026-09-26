@@ -57,18 +57,22 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          $size = 16384
-          $cs = Get-CimInstance Win32_ComputerSystem
-          if ($cs.AutomaticManagedPagefile) {
-            Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $false }
+          try {
+            $size = 16384
+            $cs = Get-CimInstance Win32_ComputerSystem
+            if ($cs.AutomaticManagedPagefile) {
+              Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $false }
+            }
+            $pf = Get-CimInstance Win32_PageFileSetting | Select-Object -First 1
+            if ($pf) {
+              Set-CimInstance -InputObject $pf -Property @{ InitialSize = $size; MaximumSize = $size }
+            } else {
+              New-CimInstance -ClassName Win32_PageFileSetting -Property @{ Name = 'C:\pagefile.sys'; InitialSize = $size; MaximumSize = $size }
+            }
+            Get-CimInstance Win32_PageFileSetting | Format-Table Name, InitialSize, MaximumSize -AutoSize
+          } catch {
+            Write-Warning "Pagefile adjustment failed: $_"
           }
-          $pf = Get-CimInstance Win32_PageFileSetting -Filter "Name='C:\pagefile.sys'"
-          if ($pf) {
-            Set-CimInstance -InputObject $pf -Property @{ InitialSize = $size; MaximumSize = $size }
-          } else {
-            New-CimInstance -ClassName Win32_PageFileSetting -Property @{ Name = 'C:\pagefile.sys'; InitialSize = $size; MaximumSize = $size }
-          }
-          Get-CimInstance Win32_PageFileSetting | Format-Table Name, InitialSize, MaximumSize -AutoSize
 
       - name: Restore libraries.
         id: libs
