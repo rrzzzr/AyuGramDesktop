@@ -53,6 +53,13 @@ winget install RadolynLabs.AyuGramDesktop
 #### Scoop
 
 ```bash
+scoop bucket add ayugram https://github.com/rrzzzr/AyuGramDesktop
+scoop install ayugram/ayugram
+```
+
+Or install the community manifest from the `extras` bucket:
+
+```bash
 scoop bucket add extras
 scoop install ayugram
 ```

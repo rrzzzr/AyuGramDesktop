@@ -1,0 +1,22 @@
+{
+    "version": "7.0.9",
+    "description": "AyuGram is a Telegram client with ghost mode and message history.",
+    "homepage": "https://github.com/rrzzzr/AyuGramDesktop",
+    "license": {
+        "identifier": "Freeware",
+        "url": "https://github.com/rrzzzr/AyuGramDesktop/blob/dev/LICENSE"
+    },
+    "url": "https://github.com/rrzzzr/AyuGramDesktop/releases/download/v7.0.9/AyuGram.zip",
+    "hash": "TODO_RUN_THE_WINDOWS_RELEASE_WORKFLOW",
+    "shortcuts": [
+        [
+            "AyuGram.exe",
+            "AyuGram"
+        ]
+    ],
+    "persist": "tdata",
+    "checkver": "github",
+    "autoupdate": {
+        "url": "https://github.com/rrzzzr/AyuGramDesktop/releases/download/v$version/AyuGram.zip"
+    }
+}

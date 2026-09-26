@@ -1,0 +1,170 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v7.0.9). Leave empty to only build.'
+        required: false
+        default: ''
+      debug_build:
+        description: 'Build the Debug configuration instead of Release.'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  windows:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 350
+
+    env:
+      Platform: x64
+      BUILD_CONFIG: ${{ github.event.inputs.debug_build == 'true' && 'Debug' || 'Release' }}
+
+    steps:
+      - name: Checkout.
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Python.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Set up MSVC.
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Check disk space.
+        shell: pwsh
+        run: Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+
+      - name: Cache libraries.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/../Libraries
+            ${{ github.workspace }}/../ThirdParty
+          key: win64-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py', 'cmake/**') }}
+
+      - name: Prepare libraries.
+        working-directory: Telegram/build/prepare
+        run: .\win.bat
+
+      - name: Configure.
+        working-directory: Telegram
+        run: .\configure.bat x64 -DTDESKTOP_API_ID=${{ vars.TDESKTOP_API_ID || '2040' }} -DTDESKTOP_API_HASH=${{ vars.TDESKTOP_API_HASH || 'b18441a1ff607e10a989891a5462e627' }}
+
+      - name: Build.
+        run: cmake --build out --config ${{ env.BUILD_CONFIG }} --target Telegram
+
+      - name: Package portable archive.
+        shell: pwsh
+        run: |
+          $config = Join-Path 'out' $env:BUILD_CONFIG
+          $files = @('AyuGram.exe', 'Updater.exe', 'modules')
+          foreach ($file in $files) {
+            if (-not (Test-Path (Join-Path $config $file))) {
+              throw "$file was not produced in $config"
+            }
+          }
+          $pkg = Join-Path $PWD 'dist\pkg'
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          foreach ($file in $files) {
+            Copy-Item -Recurse (Join-Path $config $file) $pkg
+          }
+          $sevenZip = (Get-Command 7z.exe -ErrorAction SilentlyContinue).Source
+          if (-not $sevenZip) {
+            $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          }
+          Push-Location $pkg
+          & $sevenZip a -tzip -mx=9 ..\AyuGram.zip *
+          Pop-Location
+          Get-FileHash 'dist\AyuGram.zip' -Algorithm SHA256 | Format-List
+
+      - name: Upload artifact.
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-windows-x64
+          path: dist/AyuGram.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: windows
+    if: ${{ github.ref_type == 'tag' || github.event.inputs.tag != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact.
+        uses: actions/download-artifact@v4
+        with:
+          name: AyuGram-windows-x64
+          path: dist
+
+      - name: Resolve version.
+        id: version
+        run: |
+          tag="${{ github.ref_type == 'tag' && github.ref_name || github.event.inputs.tag }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "hash=$(sha256sum dist/AyuGram.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/AyuGram.zip --clobber
+          else
+            gh release create "$TAG" dist/AyuGram.zip \
+              --title "AyuGram $VERSION" \
+              --generate-notes
+          fi
+
+      - name: Checkout manifest branch.
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 1
+
+      - name: Update Scoop manifest.
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          HASH: ${{ steps.version.outputs.hash }}
+        run: |
+          set -e
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/AyuGram.zip"
+          jq --arg v "$VERSION" --arg u "$url" --arg h "$HASH" \
+            '.version = $v | .url = $u | .hash = $h' \
+            bucket/ayugram.json > bucket/ayugram.json.tmp
+          mv bucket/ayugram.json.tmp bucket/ayugram.json
+          if git diff --quiet -- bucket/ayugram.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bucket/ayugram.json
+          git commit -m "chore: update scoop manifest for ${TAG}"
+          git push
