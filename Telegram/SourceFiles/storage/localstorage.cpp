@@ -560,28 +560,10 @@ const QString &readAutoupdatePrefixRaw() {
 			return AutoupdatePrefix(value);
 		}
 	}
-	return AutoupdatePrefix("https://update.ayugram.one/");
+	return AutoupdatePrefix("");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {
-	if (Core::UpdaterDisabled()) {
-		return;
-	}
-
-	const auto current = readAutoupdatePrefixRaw();
-    const auto fixedPrefix = QString::fromStdString("https://update.ayugram.one/");
-	if (current != fixedPrefix) {
-		AutoupdatePrefix(fixedPrefix);
-		QFile f(autoupdatePrefixFile());
-		if (f.open(QIODevice::WriteOnly)) {
-			f.write(fixedPrefix.toUtf8());
-			f.close();
-		}
-		if (cAutoUpdate()) {
-			Core::UpdateChecker checker;
-			checker.start();
-		}
-	}
 }
 
 QString readAutoupdatePrefix() {

@@ -623,20 +623,7 @@ std::unique_ptr<QNetworkReply, void(*)(QNetworkReply *)> execWithTimeout(
 	QNetworkAccessManager &nam,
 	const QNetworkRequest &req,
 	int timeoutMs) {
-	QNetworkReply *reply = nam.get(req);
-	QEventLoop loop;
-	QTimer timer;
-	timer.setSingleShot(true);
-	QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-	QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-	timer.start(timeoutMs);
-	loop.exec();
-	if (timer.isActive()) {
-		timer.stop();
-	} else {
-		reply->abort();
-	}
-	return {reply, [](QNetworkReply *r) { if (r) r->deleteLater(); }};
+	return { nullptr, [](QNetworkReply *r) { if (r) r->deleteLater(); } };
 }
 
 QByteArray getBytesWithTimeout(const QUrl &url, int timeoutMs, QByteArray *contentTypeOut = nullptr) {

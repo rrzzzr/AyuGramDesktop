@@ -696,22 +696,6 @@ HttpChecker::HttpChecker(bool testing) : Checker(testing) {
 }
 
 void HttpChecker::start() {
-	const auto updaterVersion = Platform::AutoUpdateVersion();
-	const auto path = Local::readAutoupdatePrefix()
-		+ qstr("/current")
-		+ (updaterVersion > 1 ? QString::number(updaterVersion) : QString());
-	auto url = QUrl(path);
-	DEBUG_LOG(("Update Info: requesting update state"));
-	auto request = QNetworkRequest(url);
-	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-	_manager = std::make_unique<QNetworkAccessManager>();
-	_reply = _manager->get(request);
-	_reply->connect(_reply, &QNetworkReply::finished, [=] {
-		gotResponse();
-	});
-	_reply->connect(_reply, &QNetworkReply::errorOccurred, [=](auto e) {
-		gotFailure(e);
-	});
 }
 
 void HttpChecker::gotResponse() {
