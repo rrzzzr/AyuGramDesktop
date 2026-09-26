@@ -2,6 +2,8 @@ name: Windows release
 
 on:
   push:
+    branches:
+      - dev
     tags:
       - 'v*'
   workflow_dispatch:
@@ -51,25 +53,60 @@ jobs:
         with:
           arch: x64
 
-      - name: Check disk space.
+      - name: Increase pagefile.
+        continue-on-error: true
         shell: pwsh
-        run: Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+        run: |
+          $size = 16384
+          $cs = Get-CimInstance Win32_ComputerSystem
+          if ($cs.AutomaticManagedPagefile) {
+            Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $false }
+          }
+          $pf = Get-CimInstance Win32_PageFileSetting -Filter "Name='C:\pagefile.sys'"
+          if ($pf) {
+            Set-CimInstance -InputObject $pf -Property @{ InitialSize = $size; MaximumSize = $size }
+          } else {
+            New-CimInstance -ClassName Win32_PageFileSetting -Property @{ Name = 'C:\pagefile.sys'; InitialSize = $size; MaximumSize = $size }
+          }
+          Get-CimInstance Win32_PageFileSetting | Format-Table Name, InitialSize, MaximumSize -AutoSize
 
-      - name: Cache libraries.
-        uses: actions/cache@v4
+      - name: Restore libraries.
+        id: libs
+        uses: actions/cache/restore@v4
         with:
           path: |
             ${{ github.workspace }}/../Libraries
             ${{ github.workspace }}/../ThirdParty
-          key: win64-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py', 'cmake/**') }}
+          key: win64-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py') }}
+          restore-keys: |
+            win64-libs-
 
       - name: Prepare libraries.
         working-directory: Telegram/build/prepare
-        run: .\win.bat
+        run: .\win.bat silent
+
+      - name: Save libraries.
+        if: ${{ success() && steps.libs.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ github.workspace }}/../Libraries
+            ${{ github.workspace }}/../ThirdParty
+          key: win64-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py') }}
+
+      - name: Throttle MSVC parallelism.
+        shell: pwsh
+        run: |
+          $file = 'cmake/options_win.cmake'
+          (Get-Content $file -Raw) -replace '/MP\b', '/MP2' | Set-Content $file -NoNewline
+          Select-String -Path $file -Pattern '/MP'
 
       - name: Configure.
         working-directory: Telegram
-        run: .\configure.bat x64 -DTDESKTOP_API_ID=${{ vars.TDESKTOP_API_ID || '2040' }} -DTDESKTOP_API_HASH=${{ vars.TDESKTOP_API_HASH || 'b18441a1ff607e10a989891a5462e627' }}
+        run: >
+          .\configure.bat x64
+          -DTDESKTOP_API_ID=${{ vars.TDESKTOP_API_ID || '2040' }}
+          -DTDESKTOP_API_HASH=${{ vars.TDESKTOP_API_HASH || 'b18441a1ff607e10a989891a5462e627' }}
 
       - name: Build.
         run: cmake --build out --config ${{ env.BUILD_CONFIG }} --target Telegram
@@ -99,11 +136,13 @@ jobs:
           Get-FileHash 'dist\AyuGram.zip' -Algorithm SHA256 | Format-List
 
       - name: Upload artifact.
+        if: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
         uses: actions/upload-artifact@v4
         with:
           name: AyuGram-windows-x64
           path: dist/AyuGram.zip
           if-no-files-found: error
+          compression-level: 0
 
   release:
     name: Publish release
